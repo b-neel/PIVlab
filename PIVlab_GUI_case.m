@@ -13,7 +13,7 @@
 % Exportfig by Ben Hinkle
 % mmstream2 by Duane Hanselman
 % f_readB16 by Carl Hall
-function PIVlab_GUI_case(desired_num_cores, data_dir, data_id)
+function PIVlab_GUI_case(desired_num_cores, imgs_dir, masks_dir)
 %% Make figure
 fh = findobj('tag', 'hgui');
 if isempty(fh)
@@ -266,24 +266,29 @@ if isempty(fh)
 
 	%% Process case in GUI
         % import images
-        imgs_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-uint8', data_id), '*.tif');
+        %imgs_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-uint8', data_id), '*.tif');
         put('sequencer', 0);
-        path = dir(imgs_dir); %list files, then change name to full path
-        path = table2struct(sortrows(struct2table(path), 'name')); %sort im names
-        for i=1: numel(path)
-            path(i).name = fullfile(path(i).folder, path(i).name);
+        im_paths = dir(imgs_dir); %list im filepaths into struct, then change name to full path
+        im_paths = table2struct(sortrows(struct2table(im_paths), 'name')); %sort im names
+        for i=1: numel(im_paths)
+                im_paths(i).name = fullfile(im_paths(i).folder, im_paths(i).name);
         end
         % call load images button
-        loadimgsbutton_Callback([], [], 0, path)
+        loadimgsbutton_Callback([], [], 0, im_paths)
 
         % import  masks
-        masks_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-masks', data_id), '*.tif');
-        load_external_masks(masks_dir)
+        if exist('masks_dir', 'var')
+                disp('Loading external masks.')
+        	load_external_masks(masks_dir);
+        end
+                
+        %masks_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-masks', data_id), '*.tif');
+        
 
 	if ~exist('batch_session_file','var') %no input argument --> no GUI batch processing
-		put('batchModeActive',0)
+	        put('batchModeActive',0)
 	else
-		if exist (batch_session_file,'file')
+        	if exist (batch_session_file,'file')
 			[filepath,name,ext] = fileparts(batch_session_file);
 			load_session_Callback (1,batch_session_file)
 			disp('')
@@ -311,6 +316,7 @@ else %Figure handle does already exist --> bring PIVlab to foreground.
 	disp('Only one instance of PIVlab is allowed to run.')
 	figure(fh)
 end
+
 function generateMenu
 %% Menu items
 m1 = uimenu('Label','File');
@@ -4771,18 +4777,17 @@ if size(filepath,1) > 1 %did the user load images?
 	end
 end
 
-function load_external_masks(filepath)
+function load_external_masks(dirpath)
 
-%filepath=retr('filepath');
+filepath=retr('filepath');
 handles=gethand;
 %[FileName,PathName] = uigetfile('*.tif','Select the binary image mask file','multiselect','on');
 
-paths = dir(filepath);
-paths = table2struct(sortrows(struct2table(paths), 'name')); %sort im names
+paths = dir(dirpath); %get names
+paths = table2struct(sortrows(struct2table(paths), 'name')); %sort masks names
 
 %if isequal(FileName,0) | isequal(PathName,0)
-if numel(paths)==0
-else
+if numel(paths)>0
         AnzahlMasks=numel(paths);
         for j=1:AnzahlMasks
                 A=imread(fullfile(paths(j).folder, paths(j).name));
