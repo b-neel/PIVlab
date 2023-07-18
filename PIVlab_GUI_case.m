@@ -13,7 +13,7 @@
 % Exportfig by Ben Hinkle
 % mmstream2 by Duane Hanselman
 % f_readB16 by Carl Hall
-function PIVlab_GUI(desired_num_cores,batch_session_file)
+function PIVlab_GUI_case(desired_num_cores, data_dir, data_id)
 %% Make figure
 fh = findobj('tag', 'hgui');
 if isempty(fh)
@@ -264,7 +264,21 @@ if isempty(fh)
 	end
 	set(MainWindow, 'Visible','on');
 
-	%% Batch session  processing in GUI
+	%% Process case in GUI
+        % import images
+        imgs_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-uint8', data_id), '*.tif');
+        put('sequencer', 0);
+        path = dir(imgs_dir); %list files, then change name to full path
+        for i=1: numel(path)
+            path(i).name = fullfile(path(i).folder, path(i).name);
+        end
+        % call load images button
+        loadimgsbutton_Callback([], [], 0, path)
+
+        % import  masks
+        masks_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-masks', data_id), '*.tif');
+        load_external_masks(masks_dir)
+
 	if ~exist('batch_session_file','var') %no input argument --> no GUI batch processing
 		put('batchModeActive',0)
 	else
@@ -4756,6 +4770,96 @@ if size(filepath,1) > 1 %did the user load images?
 	end
 end
 
+function load_external_masks(filepath)
+
+filepath=retr('filepath');
+handles=gethand;
+if size(filepath,1) > 1 %did the user load images?
+	[FileName,PathName] = uigetfile('*.tif','Select the binary image mask file','multiselect','on');
+        dir(filepath);
+
+	if isequal(FileName,0) | isequal(PathName,0)
+	else
+		if ischar(FileName)==1
+			AnzahlMasks=1;
+		else
+			AnzahlMasks=numel(FileName);
+		end
+		for j=1:AnzahlMasks
+			if AnzahlMasks>1
+				A=imread(fullfile(PathName,FileName{j}));
+				set (handles.external_mask_progress, 'string', ['Please wait... (' int2str((j-1)/AnzahlMasks*100) '%)']);
+				drawnow;
+			else
+				A=imread(fullfile(PathName,FileName));
+			end
+			A=im2bw(A,0.5); %#ok<*IM2BW>
+			A1=zeros(size(A));
+			A2=A1;A3=A1;A4=A1;
+			%cut mask in 4 pieces to minimize parent / child / hole problems in masks
+			rowshalf=round(size(A,1)/2);
+			colshalf=round(size(A,2)/2);
+			%A1(1:rowshalf,1:colshalf) = A(1:rowshalf,1:colshalf);%top left part
+			%A2(1:rowshalf,colshalf+1:end) = A(1:rowshalf,colshalf+1:end);%top right half
+			%A3(rowshalf+1:end,1:colshalf) = A(rowshalf+1:end,1:colshalf); % lower left part
+			%A4(rowshalf+1:end,colshalf+1:end) = A(rowshalf+1:end,colshalf+1:end); %lower right part
+			A1(1:rowshalf,1:colshalf) = A(1:rowshalf,1:colshalf);%top left part
+			A2(1:rowshalf,colshalf:end) = A(1:rowshalf,colshalf:end);%top right half
+			A3(rowshalf:end,1:colshalf) = A(rowshalf:end,1:colshalf); % lower left part
+			A4(rowshalf:end,colshalf:end) = A(rowshalf:end,colshalf:end); %lower right part
+
+
+			%A(:,round(size(A,2)/2))=0;
+			%A(round(size(A,1)/2),:)=0;
+			%B=A;
+			%B=im2bw(abs(A-B));
+
+
+			bwbound=[bwboundaries(A1); bwboundaries(A2) ; bwboundaries(A3) ; bwboundaries(A4)];
+			%bwbound=bwboundaries(A);
+
+			importmaskx=cell(size(bwbound,1),1);
+			importmasky=importmaskx;
+			for i=1:size(bwbound,1)
+				temp=bwbound{i,1};
+				importmasky{i,1}=temp(1:10:end,1);
+				temp=bwbound{i,1};
+				importmaskx{i,1}=temp(1:10:end,2);
+			end
+			maskiererx=retr('maskiererx');
+			maskierery=retr('maskierery');
+
+			currentframe=2*floor(get(handles.fileselector, 'value'))-1 + 2*(j-1);
+			if isempty(maskiererx)
+				maskiererx=cell(i,currentframe+1);
+				maskierery=maskiererx;
+			end
+			maskiererx(1:i,currentframe)=importmaskx;
+			maskiererx(1:i,currentframe+1)=importmaskx;
+			maskierery(1:i,currentframe)=importmasky;
+			maskierery(1:i,currentframe+1)=importmasky;
+
+
+			put('maskiererx' ,maskiererx);
+			put('maskierery' ,maskierery);
+			if j >= AnzahlMasks
+				set(handles.mask_hint, 'String', 'Mask active', 'backgroundcolor', [0.5 1 0.5]);
+				dispMASK(0.5)
+			end
+
+
+		end
+		set (handles.external_mask_progress, 'string', 'External mask(s) loaded.');
+
+		%maskiererxundy abschneiden wenn länger als anderes zeugs
+		if size(maskiererx,2)>size(filepath,1) %user loaded more masks than there are frames
+			maskiererx (:,size(filepath,1)+1:end) = [];
+			maskierery  (:,size(filepath,1)+1:end) = [];
+			put('maskiererx' ,maskiererx);
+			put('maskierery' ,maskierery);
+		end
+	end
+end
 
 function external_mask_Callback(~, ~, ~)
 uiwait(helpdlg(['You can load grayscale *.tif image(s) here:' sprintf('\n') 'White = masked, black = no mask.' sprintf('\n') 'If you select multiple mask files, they will be sorted alphabetically and inserted starting from the currently active frame.']));
