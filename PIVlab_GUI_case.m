@@ -13,7 +13,7 @@
 % Exportfig by Ben Hinkle
 % mmstream2 by Duane Hanselman
 % f_readB16 by Carl Hall
-function PIVlab_GUI_case(desired_num_cores, imgs_dir, masks_dir)
+function PIVlab_GUI_case(desired_num_cores, imgs_dir, masks_dir, session_file)
 %% Make figure
 fh = findobj('tag', 'hgui');
 if isempty(fh)
@@ -265,8 +265,7 @@ if isempty(fh)
 	set(MainWindow, 'Visible','on');
 
 	%% Process case in GUI
-        % import images
-        %imgs_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-uint8', data_id), '*.tif');
+        % import images, ensure sequencer to 0
         put('sequencer', 0);
         im_paths = dir(imgs_dir); %list im filepaths into struct, then change name to full path
         im_paths = table2struct(sortrows(struct2table(im_paths), 'name')); %sort im names
@@ -278,39 +277,34 @@ if isempty(fh)
 
         % import  masks
         if exist('masks_dir', 'var')
-                disp('Loading external masks.')
+                disp('...loading external masks...')
         	load_external_masks(masks_dir);
         end
-                
-        %masks_dir = fullfile(data_dir, 'piv-images', sprintf('%04d-masks', data_id), '*.tif');
-        
+        %if exist('parameters', 'var')
+        %        for i=1: numel(parameters)
+        %        end
+        %end
 
-	if ~exist('batch_session_file','var') %no input argument --> no GUI batch processing
-	        put('batchModeActive',0)
-	else
-        	if exist (batch_session_file,'file')
-			[filepath,name,ext] = fileparts(batch_session_file);
-			load_session_Callback (1,batch_session_file)
-			disp('')
-			disp(['Batch mode, analyzing ' batch_session_file])
-			batch_session_file_output=fullfile(filepath,[name '_BATCH' ext]);
-			disp(['Output will be saved as:  ' batch_session_file_output ])
-			disp('...running PIV analysis...')
-			do_analys_Callback
-			AnalyzeAll_Callback
-			disp('...running post processing...')
-			apply_filter_all_Callback
-			disp('...saving output...')
-			save_session_Callback(1,batch_session_file_output)
+        [save_dir, fname, ext] = fileparts(session_file);
+        if exist (session_file,'file')
+                load_session_Callback (1,session_file)
+                disp('')
+                disp(['Loading existing session file' session_file])
+        end
+        [savedir, fname, ext] = fileparts(session_file);
+        disp(['Initial session saved as:  ' session_file ])
+        save_session_Callback(1, session_file)
+        disp('...running PIV analysis...')
+        do_analys_Callback
+        AnalyzeAll_Callback
+        disp('...running post processing...')
+        apply_filter_all_Callback
+        disp('...saving output...')
+        mat_file_save(1, [fname '-PIVlab' ext], savedir, 2)
 
-			put('batchModeActive',1)
-			disp('done, exiting...')
-			MainWindow_CloseRequestFcn
-		else
-			disp(['NOT FOUND: ' batch_session_file])
-			put('batchModeActive',0)
-		end
-	end
+        put('batchModeActive',1)
+        disp('done, exiting...')
+        MainWindow_CloseRequestFcn
 
 else %Figure handle does already exist --> bring PIVlab to foreground.
 	disp('Only one instance of PIVlab is allowed to run.')
