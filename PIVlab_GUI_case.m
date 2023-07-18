@@ -265,6 +265,10 @@ if isempty(fh)
 	set(MainWindow, 'Visible','on');
 
 	%% Process case in GUI
+        % import settings
+        [savedir, fname, ext] = fileparts(session_file);
+	%load(fullfile(savedir, 'PIVlab_settings_default.mat'));
+	read_settings('PIVlab_settings_default.mat', savedir);
         % import images, ensure sequencer to 0
         put('sequencer', 0);
         im_paths = dir(imgs_dir); %list im filepaths into struct, then change name to full path
@@ -285,13 +289,11 @@ if isempty(fh)
         %        end
         %end
 
-        [save_dir, fname, ext] = fileparts(session_file);
         if exist (session_file,'file')
                 load_session_Callback (1,session_file)
                 disp('')
                 disp(['Loading existing session file' session_file])
         end
-        [savedir, fname, ext] = fileparts(session_file);
         disp(['Initial session saved as:  ' session_file ])
         save_session_Callback(1, session_file)
         disp('...running PIV analysis...')
