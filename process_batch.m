@@ -13,7 +13,7 @@ settings = table2struct(readtable(fullfile(savedir, 'PIVlab_settings_additional-
 n_cores = 10;
 
 %% Loop through cases
-for i=1: length(settings)
+for i=90: length(settings)
     k = sprintf('%04d', settings(i).data_id);
     
     imgs = fullfile(imdir, [k '-uint8']);
